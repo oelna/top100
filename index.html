@@ -1,1 +1,673 @@
-<!DOCTYPE html><html lang="en"><head>	<!--		Code taken from		https://slimedrippings.tumblr.com/gamefaqssort		Original Code grabbed from the view-source: of 		http://blingbling.konjiki.jp/bbst.html	-->	<meta charset="utf-8" />	<title>Sort some games or something!</title>	<meta name="viewport" content="width=device-width, initial-scale=1" />	<style>		* {			box-sizing: border-box;		}		html {			font: 100%/1.4 system-ui, sans-serif;		}		body { margin: 0; }		a { color: currentColor; }		.hidden {			display: none;		}		#wrapper {			width: 100%;			padding: 0 1rem;			max-width: 70ch;			margin: 1rem auto;		}		.intro h2 {			margin: 0 0 0.5rem 0;		}		.intro button {			float: right;			vertical-align: middle;		}		.intro:nth-child(3) {			padding-bottom: 1rem;			border-bottom: 1px solid #bbb;			margin-bottom: 2rem;		}		.intro textarea {			display: block;			width: 100%;			resize: vertical;			background-color: #f4f4f4;			font-size: 100%;			font-family: ui-monospace, monospace;			line-height: 1.25;			min-height: 8rem;			padding: 0.1em 0.25em;			margin-bottom: 0.5rem;		}		.intro #add-custom {			float: none;		}		#main-table {			width: 100%;			margin: 0 auto;		}		#main-table #battle-number p {			text-align: center;			margin: 0 0 0.25rem 0;		}		#main-table ul {			display: flex;			justify-content: space-between;			padding: 0;		}		#main-table li {			flex-basis: 32%;			min-height: 8rem;			border: 1px solid #bbb;			padding: 0.5em;			list-style: none;			text-align: center;			display: flex;			cursor: pointer;			user-select: none;			transition: border 0.2s ease;		}		#main-table li:hover {			border-color: #888;		}		#main-table li p {			width: 100%;			align-self: center;		}		#result-field ol {			width: 100%;			margin: 0 auto;			counter-reset: ranking 0;		}		#result-field li {				padding-left: 0.5rem;				border-bottom: 1px solid #eee;				margin-bottom: 0.25rem;				padding-bottom: 0.25rem;				counter-increment: ranking;		}		#result-field li::marker {			color: #000;			content: counter(ranking) ".";		}		@media all and (min-width: 60em) {			#wrapper {				margin-top: 3rem;			}			#main-table,			#result-field ol {				width: 60%;			}		}	</style></head><body>	<div id="wrapper">  		<div class="intro">			<h2>				<span>What is this?</span>				<button class="toggle-detail">show&hairsp;/&hairsp;hide</button>			</h2>			<div class="text hidden">				<p>So apparently GameFAQs is <a href="http://www.gamefaqs.com/features/bge20_vote" data-external="true">having some weird silly "best game ever" voting competition</a> and I figured this would probably be a much more bearable form of picking favorites. More detailed too since it compares every game to every other game instead of just being about what "number one" is.</p>				<p>The sorter uses GameFAQs' list of 128 games, which were apparently nominated in via an assortment of methods and come from multiple generations.</p>			</div>		</div>				<div class="intro">			<h2>				<span>Ok, how do I use this?</span>				<button class="toggle-detail">show&hairsp;/&hairsp;hide</button>			</h2>			<div class="text hidden">				<p>Just click on the name of whichever game you like more! If you love or hate both games equally, or simply dont know either of the games, click "I feel the same way about both".</p>				<p>Using this sorter can take between 127 and 448 "battles", so please make yourself comfortable and take care of any responsibilities prior to starting your sorting.</p>			</div>		</div>		<div class="intro">			<h2>				<span>I'd like to use my own terms!</span>				<button class="toggle-detail">show&hairsp;/&hairsp;hide</button>			</h2>			<div class="text hidden">				<p>It is possible! Just add them to the text field, one word per line. And if you'd like to reset to the <a href="#" class="set-link" data-terms="games">default games</a>, you can do that, too.</p>				<textarea id="custom-words"></textarea>				<button id="add-custom">Use</button>			</div>		</div>		<div id="main-table">			<div id="battle-number"></div>			<ul>				<li id="left-field" class="sort-field" data-amount="-1"></li>				<li id="middle-field" class="sort-field" data-amount="0"><p>I feel the same way about both</p></li>				<li id="right-field" class="sort-field" data-amount="1"></li>			</ul>		</div>		<div id="result-field"></div>		<button onclick="ranks.reset()">Reset</button>		<script>		'use strict';		class ranking {			constructor (entries, controls) {				this.reset(entries, controls);			}			reset(entries, controls) {				if (entries) this.namMember = entries;				if (this.namMember == null || this.namMember.length < 2) {					console.error('You need to provide an array of strings to be sorted!');					return;				}				this.lstMember = [];				this.parent = [];				this.equal = [];				this.rec = [];				this.cmp1 = null;				this.cmp2 = null;				this.head1 = null;				this.head2 = null;				this.nrec = null;				this.numQuestion = null;				this.totalSize = null;				this.finishSize = null;				this.finishFlag = null;				if (controls) this.controls = controls;				if (this.controls == null) {					console.error('You need to provide control elements!');					return;				}				this.controls.result.classList.add('hidden');				this.controls.main.classList.remove('hidden');				// hook up buttons				const self = this;				let buttons = [					this.controls.left,					this.controls.center,					this.controls.right				];								buttons.forEach(function (ele, i) {					// attach reference to class object					ele.rankingClass = self;					ele.setAttribute('data-amount', i - 1);					ele.addEventListener('click', self.handleClick, false);				});				this.initList();				this.showImage();			}			handleClick(event) {				event.preventDefault();				const amount = parseInt(event.target.dataset.amount);				if(this.rankingClass.finishFlag == 0) {					this.rankingClass.sortList(amount);				}			}			initList() {			    let n = 0;			    let mid;			    let i;			    // sequence to be sorted			    this.lstMember[n] = [];			    for (let i = 0; i < this.namMember.length; i++) {			        this.lstMember[n][i] = i;			    }			    this.parent[n] = -1;			    this.totalSize = 0;			    n += 1;			    for (let i = 0; i < this.lstMember.length; i++) {			        if (this.lstMember[i].length >= 2) {			            mid = Math.ceil(this.lstMember[i].length / 2);			            this.lstMember[n] = [];			            this.lstMember[n] = this.lstMember[i].slice(0, mid);			            this.totalSize += this.lstMember[n].length;			            this.parent[n] = i;			            n += 1;			            this.lstMember[n] = [];			            this.lstMember[n] = this.lstMember[i].slice(mid, this.lstMember[i].length);			            this.totalSize += this.lstMember[n].length;			            this.parent[n] = i;			            n += 1;			        }			    }			    // storage array			    for (let i = 0; i < this.namMember.length; i++) {			        this.rec[i] = 0;			    }			    this.nrec = 0;			    for (let i = 0; i <= this.namMember.length; i++) {			        this.equal[i] = -1;			    }			    this.cmp1 = this.lstMember.length - 2;			    this.cmp2 = this.lstMember.length - 1;			    this.head1 = 0;			    this.head2 = 0;			    this.numQuestion = 1;			    this.finishSize = 0;			    this.finishFlag = 0;			}			sortList(flag) {			    let i;			    let str;			    if (this.lstMember.length === 1) {			    	console.warn('Already done sorting!');			    	return;			    }			    // save the rec			    if (flag < 0) {			        this.rec[this.nrec] = this.lstMember[this.cmp1][this.head1];			        this.head1++;			        this.nrec++;			        this.finishSize++;			        while (this.equal[this.rec[this.nrec - 1]] != -1) {			            this.rec[this.nrec] = this.lstMember[this.cmp1][this.head1];			            this.head1++;			            this.nrec++;			            this.finishSize++;			        }			    } else if (flag > 0) {			        this.rec[this.nrec] = this.lstMember[this.cmp2][this.head2];			        this.head2++;			        this.nrec++;			        this.finishSize++;			        while (this.equal[this.rec[this.nrec - 1]] != -1) {			            this.rec[this.nrec] = this.lstMember[this.cmp2][this.head2];			            this.head2++;			            this.nrec++;			            this.finishSize++;			        }			    } else {			        this.rec[this.nrec] = this.lstMember[this.cmp1][this.head1];			        this.head1++;			        this.nrec++;			        this.finishSize++;			        while (this.equal[this.rec[this.nrec - 1]] != -1) {			            this.rec[this.nrec] = this.lstMember[this.cmp1][this.head1];			            this.head1++;			            this.nrec++;			            this.finishSize++;			        }			        this.equal[this.rec[this.nrec - 1]] = this.lstMember[this.cmp2][this.head2];			        this.rec[this.nrec] = this.lstMember[this.cmp2][this.head2];			        this.head2++;			        this.nrec++;			        this.finishSize++;			        while (this.equal[this.rec[this.nrec - 1]] != -1) {			            this.rec[this.nrec] = this.lstMember[this.cmp2][this.head2];			            this.head2++;			            this.nrec++;			            this.finishSize++;			        }			    }			    // processing after it has finished scanning the list of one			    if (this.head1 < this.lstMember[this.cmp1].length && this.head2 == this.lstMember[this.cmp2].length) {			        // cmp2 list is scanned - copy the rest of the list cmp1			        while (this.head1 < this.lstMember[this.cmp1].length) {			            this.rec[this.nrec] = this.lstMember[this.cmp1][this.head1];			            this.head1++;			            this.nrec++;			            this.finishSize++;			        }			    } else if (this.head1 == this.lstMember[this.cmp1].length && this.head2 < this.lstMember[this.cmp2].length) {			        // cmp1 list is scanned - copy the rest of the list cmp2			        while (this.head2 < this.lstMember[this.cmp2].length) {			            this.rec[this.nrec] = this.lstMember[this.cmp2][this.head2];			            this.head2++;			            this.nrec++;			            this.finishSize++;			        }			    }			    // if you reach the end of the list of both			    // I want to update the parent list			    if (this.head1 == this.lstMember[this.cmp1].length && this.head2 == this.lstMember[this.cmp2].length) {			        for (let i = 0; i < this.lstMember[this.cmp1].length + this.lstMember[this.cmp2].length; i++) {			            this.lstMember[this.parent[this.cmp1]][i] = this.rec[i];			        }			        this.lstMember.pop();			        this.lstMember.pop();			        this.cmp1 = this.cmp1 - 2;			        this.cmp2 = this.cmp2 - 2;			        this.head1 = 0;			        this.head2 = 0;			        // initialize the rec before you make a new comparison			        if (this.head1 == 0 && this.head2 == 0) {			            for (let i = 0; i < this.namMember.length; i++) {			                this.rec[i] = 0;			            }			            this.nrec = 0;			        }			    }			    if (this.cmp1 < 0) {			        str = '<p>Battle No. ' + (this.numQuestion - 1) + '</p><p>' + Math.floor(this.finishSize * 100 / this.totalSize) + '% sorted.</p>';			        this.controls.status.innerHTML = str;			        this.showResult();			        this.finishFlag = 1;			    } else {			        this.showImage();			    }			}			showResult() {			    let ranking = 1;			    let sameRank = 1;			    let str = "";			    let i;			    str += "<ol>";			    for (i = 0; i < this.namMember.length; i++) {			        str += '<li data-rank="'+ranking+'">' + this.namMember[this.lstMember[0][i]] + '</li>';			        if (i < this.namMember.length - 1) {			            if (this.equal[this.lstMember[0][i]] == this.lstMember[0][i + 1]) {			                sameRank++;			            } else {			                ranking += sameRank;			                sameRank = 1;			            }			        }			    }			    str += "</ol>";			    this.controls.main.classList.add('hidden');			    this.controls.result.classList.remove('hidden');			    this.controls.result.innerHTML = str;			}			showImage() {			    let str0 = '<p>Battle No. ' + this.numQuestion + '</p><p>' + Math.floor(this.finishSize * 100 / this.totalSize) + '% sorted.</p>';			    let str1 = '' + this.toNameFace(this.lstMember[this.cmp1][this.head1]);			    let str2 = '' + this.toNameFace(this.lstMember[this.cmp2][this.head2]);			    this.controls.status.innerHTML = str0;			    this.controls.left.innerHTML = '<p>'+str1+'</p>';			    this.controls.right.innerHTML = '<p>'+str2+'</p>';			    this.numQuestion++;			}			toNameFace(n) {			    let str = this.namMember[n];			    return str;			}		}		// hook up info buttons		document.querySelectorAll('.toggle-detail').forEach(function (ele, i) {			ele.addEventListener('click', function (e) {				const target = e.target.closest('.intro').querySelector('.text');				if (target) {					target.classList.toggle('hidden');				}			});		});		document.querySelectorAll('.set-link').forEach(function (ele, i) {			ele.addEventListener('click', function (e) {				e.preventDefault();				const terms = e.target.dataset.terms;				if (entries && terms.length > 2) {					if (window.confirm('This will lose your custom words on page reload. Are you sure you want to do this?')) {						entries = defaultTerms[terms];						ranks.reset(entries);						document.querySelector('.intro:nth-child(3) .text').classList.add('hidden');						window.localStorage.removeItem('custom-words');					}				}			});		});		// custom words interface		document.querySelector('#add-custom').addEventListener('click', function (e) {			const textarea = document.querySelector('#custom-words');			const words = textarea.value.trim().split("\n");			const filteredWords = words.filter(function (ele) {				if (ele == "" || ele == null) return false;				return true;			});			const uniqueWords = [...new Set(filteredWords)];			ranks.reset(uniqueWords, controls);			document.querySelector('.intro:nth-child(3) .text').classList.add('hidden');			// save for next visit			window.localStorage.setItem('custom-words', JSON.stringify(uniqueWords));		});		const controls = {			'main': document.querySelector('#main-table'),			'status': document.querySelector('#battle-number'),			'left': document.querySelector('#left-field'),			'center': document.querySelector('#middle-field'),			'right': document.querySelector('#right-field'),			'result': document.querySelector('#result-field')		};		const defaultTerms = {			'games': [			    "Chrono Trigger",			    "Ratchet & Clank 3",			    "Dragon Quest VIII",			    "Persona 3",			    "Batman: Arkham City",			    "Mega Man X",			    "Final Fantasy X",			    "Half-Life",			    "Smash Bros. Melee",			    "Portal",			    "Pokemon Gold/Silver",			    "World Ends with You",			    "Metal Gear Solid 4",			    "Kingdom Hearts II",			    "The Last of Us",			    "Halo 3",			    "Final Fantasy VI",			    "Assassin's Creed II",			    "Paper Mario: TYD",			    "Tales of Symphonia",			    "Star Wars: KOTOR",			    "Xenogears",			    "Zelda: The Wind Waker",			    "Pokemon X/Y",			    "Smash Bros. Wii U",			    "Planescape: Torment",			    "Super Mario Galaxy 2",			    "Mass Effect",			    "Minecraft",			    "Halo: Combat Evolved",			    "Final Fantasy VII",			    "Journey",			    "Super Mario Bros. 3",			    "Age of Empires II",			    "Pokemon Red/Blue",			    "Tetris",			    "Portal 2",			    "Sonic the Hedgehog 2",			    "Uncharted 2",			    "The Walking Dead",			    "Fallout 3",			    "Life is Strange",			    "Undertale",			    "Mass Effect 3",			    "GTA: Vice City",			    "Final Fantasy VIII",			    "Super Mario World",			    "Animal Crossing New Leaf",			    "Skyrim",			    "Phoenix Wright",			    "GoldenEye 007",			    "Diablo II",			    "Metroid Prime",			    "Morrowind",			    "Half-Life 2",			    "Demon's Souls",			    "Super Mario 64",			    "Mario Kart 8",			    "Final Fantasy Tactics",			    "Resident Evil 2",			    "Zelda: Twilight Princess",			    "Skies of Arcadia",			    "Persona 4",			    "999",			    "Zelda: Ocarina of Time",			    "Hearthstone",			    "Suikoden II",			    "Monster Hunter 4U",			    "Okami",			    "Warcraft III",			    "Final Fantasy IX",			    "Kingdom Hearts",			    "Xenoblade Chronicles",			    "DK Country 2",			    "Fire Emblem: Awakening",			    "Super Mario Maker",			    "Banjo-Kazooie",			    "Baldur's Gate II",			    "Castlevania: SOTN",			    "Phoenix Wright: Trials",			    "Zelda: A Link to the Past",			    "Cave Story",			    "Deus Ex",			    "Final Fantasy IV",			    "Metal Gear Solid V",			    "Perfect Dark",			    "Dark Souls",			    "Civilization V",			    "Super Metroid",			    "Call of Duty 4",			    "Super Mario Galaxy",			    "Dragon Age: Origins",			    "Bloodborne",			    "Final Fantasy XII",			    "Zelda: Majora's Mask",			    "Valkyria Chronicles",			    "Grand Theft Auto V",			    "Shenmue",			    "Oblivion",			    "Super Mario RPG",			    "GTA: San Andreas",			    "Shovel Knight",			    "World of Warcraft",			    "Chrono Cross",			    "The Witcher 3",			    "Binding of Isaac Rebirth",			    "Metal Gear Solid 2",			    "Resident Evil",			    "Fallout: New Vegas",			    "BioShock Infinite",			    "Resident Evil 4",			    "Paper Mario",			    "Metal Gear Solid",			    "Splatoon",			    "EarthBound",			    "Borderlands 2",			    "Shadow of the Colossus",			    "Team Fortress 2",			    "Red Dead Redemption",			    "Bayonetta 2",			    "Metal Gear Solid 3",			    "Mother 3",			    "BioShock",			    "Silent Hill 2",			    "Starcraft",			    "Destiny",			    "Mass Effect 2",			    "Virtue's Last Reward"			]		}		// restore existing custom words		let entries = [];		const customWordsData = window.localStorage.getItem('custom-words');		if (customWordsData) {			const customWords = JSON.parse(customWordsData);			entries = customWords;			document.querySelector('#custom-words').value = customWords.join("\n");		} else {			entries = defaultTerms.games;		}				// init the actual thing		const ranks = new ranking(entries, controls);		</script>	</div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<!--
+		Code taken from
+		https://slimedrippings.tumblr.com/gamefaqssort
+
+		Original Code grabbed from the view-source: of 
+		http://blingbling.konjiki.jp/bbst.html
+	-->
+	<meta charset="utf-8" />
+	<title>Sort some games or something!</title>
+
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+	<style>
+		* {
+			box-sizing: border-box;
+		}
+
+		html {
+			font: 100%/1.4 system-ui, sans-serif;
+		}
+
+		body { margin: 0; }
+
+		a { color: currentColor; }
+
+		.hidden {
+			display: none;
+		}
+
+		#wrapper {
+			width: 100%;
+			padding: 0 1rem;
+			max-width: 70ch;
+			margin: 1rem auto;
+		}
+
+		.intro h2 {
+			margin: 0 0 0.5rem 0;
+		}
+
+		.intro button {
+			float: right;
+			vertical-align: middle;
+		}
+
+		.intro:nth-child(3) {
+			padding-bottom: 1rem;
+			border-bottom: 1px solid #bbb;
+			margin-bottom: 2rem;
+		}
+
+		.intro textarea {
+			display: block;
+			width: 100%;
+			resize: vertical;
+			background-color: #f4f4f4;
+			font-size: 100%;
+			font-family: ui-monospace, monospace;
+			line-height: 1.25;
+			min-height: 8rem;
+			padding: 0.1em 0.25em;
+			margin-bottom: 0.5rem;
+		}
+
+		.intro #add-custom {
+			float: none;
+		}
+
+		#main-table {
+			width: 100%;
+			margin: 0 auto;
+		}
+
+		#main-table #battle-number p {
+			text-align: center;
+			margin: 0 0 0.25rem 0;
+		}
+
+		#main-table ul {
+			display: flex;
+			justify-content: space-between;
+			padding: 0;
+		}
+
+		#main-table li {
+			flex-basis: 32%;
+			min-height: 8rem;
+			border: 1px solid #bbb;
+			padding: 0.5em;
+			list-style: none;
+			text-align: center;
+			display: flex;
+			cursor: pointer;
+			user-select: none;
+			transition: border 0.2s ease;
+		}
+
+		#main-table li:hover {
+			border-color: #888;
+		}
+
+		#main-table li p {
+			width: 100%;
+			align-self: center;
+		}
+
+		#result-field ol {
+			width: 100%;
+			margin: 0 auto;
+			counter-reset: ranking 0;
+		}
+
+		#result-field li {
+				padding-left: 0.5rem;
+				border-bottom: 1px solid #eee;
+				margin-bottom: 0.25rem;
+				padding-bottom: 0.25rem;
+				counter-increment: ranking;
+		}
+
+		#result-field li::marker {
+			color: #000;
+			content: counter(ranking) ".";
+		}
+
+		@media all and (min-width: 60em) {
+			#wrapper {
+				margin-top: 3rem;
+			}
+
+			#main-table,
+			#result-field ol {
+				width: 60%;
+			}
+		}
+
+	</style>
+</head>
+
+<body>
+	<div id="wrapper">  
+
+		<div class="intro">
+			<h2>
+				<span>What is this?</span>
+				<button class="toggle-detail">show&hairsp;/&hairsp;hide</button>
+			</h2>
+
+			<div class="text hidden">
+				<p>So apparently GameFAQs is <a href="http://www.gamefaqs.com/features/bge20_vote" data-external="true">having some weird silly "best game ever" voting competition</a> and I figured this would probably be a much more bearable form of picking favorites. More detailed too since it compares every game to every other game instead of just being about what "number one" is.</p>
+				<p>The sorter uses GameFAQs' list of 128 games, which were apparently nominated in via an assortment of methods and come from multiple generations.</p>
+			</div>
+		</div>
+		
+		<div class="intro">
+			<h2>
+				<span>Ok, how do I use this?</span>
+				<button class="toggle-detail">show&hairsp;/&hairsp;hide</button>
+			</h2>
+
+			<div class="text hidden">
+				<p>Just click on the name of whichever game you like more! If you love or hate both games equally, or simply dont know either of the games, click "I feel the same way about both".</p>
+				<p>Using this sorter can take between 127 and 448 "battles", so please make yourself comfortable and take care of any responsibilities prior to starting your sorting.</p>
+			</div>
+		</div>
+
+		<div class="intro">
+			<h2>
+				<span>I'd like to use my own terms!</span>
+				<button class="toggle-detail">show&hairsp;/&hairsp;hide</button>
+			</h2>
+
+			<div class="text hidden">
+				<p>It is possible! Just add them to the text field, one word per line. And if you'd like to reset to the <a href="#" class="set-link" data-terms="games">default games</a>, you can do that, too.</p>
+				<textarea id="custom-words"></textarea>
+				<button id="add-custom">Use</button>
+			</div>
+		</div>
+
+		<div id="main-table">
+			<div id="battle-number"></div>
+			<ul>
+				<li id="left-field" class="sort-field" data-amount="-1"></li>
+				<li id="middle-field" class="sort-field" data-amount="0"><p>I feel the same way about both</p></li>
+				<li id="right-field" class="sort-field" data-amount="1"></li>
+			</ul>
+		</div>
+
+		<div id="result-field"></div>
+
+		<button onclick="ranks.reset()">Reset</button>
+
+		<script>
+		'use strict';
+
+		class ranking {
+
+			constructor (entries, controls) {
+				this.reset(entries, controls);
+			}
+
+			reset(entries, controls) {
+				if (entries) this.namMember = entries;
+				if (this.namMember == null || this.namMember.length < 2) {
+					console.error('You need to provide an array of strings to be sorted!');
+					return;
+				}
+				this.lstMember = [];
+				this.parent = [];
+				this.equal = [];
+				this.rec = [];
+				this.cmp1 = null;
+				this.cmp2 = null;
+				this.head1 = null;
+				this.head2 = null;
+				this.nrec = null;
+
+				this.numQuestion = null;
+				this.totalSize = null;
+				this.finishSize = null;
+				this.finishFlag = null;
+
+				if (controls) this.controls = controls;
+				if (this.controls == null) {
+					console.error('You need to provide control elements!');
+					return;
+				}
+
+				this.controls.result.classList.add('hidden');
+				this.controls.main.classList.remove('hidden');
+
+				// hook up buttons
+				const self = this;
+				let buttons = [
+					this.controls.left,
+					this.controls.center,
+					this.controls.right
+				];
+				
+				buttons.forEach(function (ele, i) {
+					// attach reference to class object
+					ele.rankingClass = self;
+
+					ele.setAttribute('data-amount', i - 1);
+					ele.addEventListener('click', self.handleClick, false);
+				});
+
+				this.initList();
+				this.showImage();
+			}
+
+			handleClick(event) {
+				event.preventDefault();
+				const amount = parseInt(event.target.dataset.amount);
+
+				if(this.rankingClass.finishFlag == 0) {
+					this.rankingClass.sortList(amount);
+				}
+			}
+
+			initList() {
+				let n = 0;
+				let mid;
+				let i;
+
+				// sequence to be sorted
+				this.lstMember[n] = [];
+				for (let i = 0; i < this.namMember.length; i++) {
+					this.lstMember[n][i] = i;
+				}
+				this.parent[n] = -1;
+				this.totalSize = 0;
+				n += 1;
+
+				for (let i = 0; i < this.lstMember.length; i++) {
+					if (this.lstMember[i].length >= 2) {
+						mid = Math.ceil(this.lstMember[i].length / 2);
+						this.lstMember[n] = [];
+						this.lstMember[n] = this.lstMember[i].slice(0, mid);
+						this.totalSize += this.lstMember[n].length;
+						this.parent[n] = i;
+						n += 1;
+						this.lstMember[n] = [];
+						this.lstMember[n] = this.lstMember[i].slice(mid, this.lstMember[i].length);
+						this.totalSize += this.lstMember[n].length;
+						this.parent[n] = i;
+						n += 1;
+					}
+				}
+
+				// storage array
+				for (let i = 0; i < this.namMember.length; i++) {
+					this.rec[i] = 0;
+				}
+				this.nrec = 0;
+
+				for (let i = 0; i <= this.namMember.length; i++) {
+					this.equal[i] = -1;
+				}
+
+				this.cmp1 = this.lstMember.length - 2;
+				this.cmp2 = this.lstMember.length - 1;
+				this.head1 = 0;
+				this.head2 = 0;
+				this.numQuestion = 1;
+				this.finishSize = 0;
+				this.finishFlag = 0;
+			}
+
+			sortList(flag) {
+				let i;
+				let str;
+
+				if (this.lstMember.length === 1) {
+					console.warn('Already done sorting!');
+					return;
+				}
+
+				// save the rec
+				if (flag < 0) {
+					this.rec[this.nrec] = this.lstMember[this.cmp1][this.head1];
+					this.head1++;
+					this.nrec++;
+					this.finishSize++;
+					while (this.equal[this.rec[this.nrec - 1]] != -1) {
+						this.rec[this.nrec] = this.lstMember[this.cmp1][this.head1];
+						this.head1++;
+						this.nrec++;
+						this.finishSize++;
+					}
+				} else if (flag > 0) {
+					this.rec[this.nrec] = this.lstMember[this.cmp2][this.head2];
+					this.head2++;
+					this.nrec++;
+					this.finishSize++;
+					while (this.equal[this.rec[this.nrec - 1]] != -1) {
+						this.rec[this.nrec] = this.lstMember[this.cmp2][this.head2];
+						this.head2++;
+						this.nrec++;
+						this.finishSize++;
+					}
+				} else {
+					this.rec[this.nrec] = this.lstMember[this.cmp1][this.head1];
+					this.head1++;
+					this.nrec++;
+					this.finishSize++;
+					while (this.equal[this.rec[this.nrec - 1]] != -1) {
+						this.rec[this.nrec] = this.lstMember[this.cmp1][this.head1];
+						this.head1++;
+						this.nrec++;
+						this.finishSize++;
+					}
+					this.equal[this.rec[this.nrec - 1]] = this.lstMember[this.cmp2][this.head2];
+					this.rec[this.nrec] = this.lstMember[this.cmp2][this.head2];
+					this.head2++;
+					this.nrec++;
+					this.finishSize++;
+					while (this.equal[this.rec[this.nrec - 1]] != -1) {
+						this.rec[this.nrec] = this.lstMember[this.cmp2][this.head2];
+						this.head2++;
+						this.nrec++;
+						this.finishSize++;
+					}
+				}
+
+				// processing after it has finished scanning the list of one
+				if (this.head1 < this.lstMember[this.cmp1].length && this.head2 == this.lstMember[this.cmp2].length) {
+					// cmp2 list is scanned - copy the rest of the list cmp1
+					while (this.head1 < this.lstMember[this.cmp1].length) {
+						this.rec[this.nrec] = this.lstMember[this.cmp1][this.head1];
+						this.head1++;
+						this.nrec++;
+						this.finishSize++;
+					}
+				} else if (this.head1 == this.lstMember[this.cmp1].length && this.head2 < this.lstMember[this.cmp2].length) {
+					// cmp1 list is scanned - copy the rest of the list cmp2
+					while (this.head2 < this.lstMember[this.cmp2].length) {
+						this.rec[this.nrec] = this.lstMember[this.cmp2][this.head2];
+						this.head2++;
+						this.nrec++;
+						this.finishSize++;
+					}
+				}
+
+				// if you reach the end of the list of both
+				// I want to update the parent list
+				if (this.head1 == this.lstMember[this.cmp1].length && this.head2 == this.lstMember[this.cmp2].length) {
+					for (let i = 0; i < this.lstMember[this.cmp1].length + this.lstMember[this.cmp2].length; i++) {
+						this.lstMember[this.parent[this.cmp1]][i] = this.rec[i];
+					}
+					this.lstMember.pop();
+					this.lstMember.pop();
+					this.cmp1 = this.cmp1 - 2;
+					this.cmp2 = this.cmp2 - 2;
+					this.head1 = 0;
+					this.head2 = 0;
+
+					// initialize the rec before you make a new comparison
+					if (this.head1 == 0 && this.head2 == 0) {
+						for (let i = 0; i < this.namMember.length; i++) {
+							this.rec[i] = 0;
+						}
+						this.nrec = 0;
+					}
+				}
+
+				if (this.cmp1 < 0) {
+					str = '<p>Battle No. ' + (this.numQuestion - 1) + '</p><p>' + Math.floor(this.finishSize * 100 / this.totalSize) + '% sorted.</p>';
+					this.controls.status.innerHTML = str;
+
+					this.showResult();
+					this.finishFlag = 1;
+				} else {
+					this.showImage();
+				}
+			}
+
+			showResult() {
+				let ranking = 1;
+				let sameRank = 1;
+				let str = "";
+				let i;
+
+				str += "<ol>";
+
+				for (i = 0; i < this.namMember.length; i++) {
+					str += '<li data-rank="'+ranking+'">' + this.namMember[this.lstMember[0][i]] + '</li>';
+					if (i < this.namMember.length - 1) {
+						if (this.equal[this.lstMember[0][i]] == this.lstMember[0][i + 1]) {
+							sameRank++;
+						} else {
+							ranking += sameRank;
+							sameRank = 1;
+						}
+					}
+				}
+				str += "</ol>";
+
+				this.controls.main.classList.add('hidden');
+				this.controls.result.classList.remove('hidden');
+				this.controls.result.innerHTML = str;
+			}
+
+			showImage() {
+				let str0 = '<p>Battle No. ' + this.numQuestion + '</p><p>' + Math.floor(this.finishSize * 100 / this.totalSize) + '% sorted.</p>';
+				let str1 = '' + this.toNameFace(this.lstMember[this.cmp1][this.head1]);
+				let str2 = '' + this.toNameFace(this.lstMember[this.cmp2][this.head2]);
+
+				this.controls.status.innerHTML = str0;
+				this.controls.left.innerHTML = '<p>'+str1+'</p>';
+				this.controls.right.innerHTML = '<p>'+str2+'</p>';
+
+				this.numQuestion++;
+			}
+
+			toNameFace(n) {
+				let str = this.namMember[n];
+				return str;
+			}
+		}
+
+		// hook up info buttons
+		document.querySelectorAll('.toggle-detail').forEach(function (ele, i) {
+			ele.addEventListener('click', function (e) {
+				const target = e.target.closest('.intro').querySelector('.text');
+
+				if (target) {
+					target.classList.toggle('hidden');
+				}
+			});
+		});
+
+		document.querySelectorAll('.set-link').forEach(function (ele, i) {
+			ele.addEventListener('click', function (e) {
+				e.preventDefault();
+				const terms = e.target.dataset.terms;
+
+				if (entries && terms.length > 2) {
+					if (window.confirm('This will lose your custom words on page reload. Are you sure you want to do this?')) {
+
+						entries = defaultTerms[terms];
+						ranks.reset(entries);
+
+						document.querySelector('.intro:nth-child(3) .text').classList.add('hidden');
+
+						window.localStorage.removeItem('custom-words');
+					}
+				}
+			});
+		});
+
+		// custom words interface
+		document.querySelector('#add-custom').addEventListener('click', function (e) {
+			const textarea = document.querySelector('#custom-words');
+			const words = textarea.value.trim().split("\n");
+			const filteredWords = words.filter(function (ele) {
+				if (ele == "" || ele == null) return false;
+				return true;
+			});
+			const uniqueWords = [...new Set(filteredWords)];
+
+			ranks.reset(uniqueWords, controls);
+
+			document.querySelector('.intro:nth-child(3) .text').classList.add('hidden');
+
+			// save for next visit
+			window.localStorage.setItem('custom-words', JSON.stringify(uniqueWords));
+		});
+
+		const controls = {
+			'main': document.querySelector('#main-table'),
+			'status': document.querySelector('#battle-number'),
+			'left': document.querySelector('#left-field'),
+			'center': document.querySelector('#middle-field'),
+			'right': document.querySelector('#right-field'),
+			'result': document.querySelector('#result-field')
+		};
+
+		const defaultTerms = {
+			'games': [
+				"Chrono Trigger",
+				"Ratchet & Clank 3",
+				"Dragon Quest VIII",
+				"Persona 3",
+				"Batman: Arkham City",
+				"Mega Man X",
+				"Final Fantasy X",
+				"Half-Life",
+				"Smash Bros. Melee",
+				"Portal",
+				"Pokemon Gold/Silver",
+				"World Ends with You",
+				"Metal Gear Solid 4",
+				"Kingdom Hearts II",
+				"The Last of Us",
+				"Halo 3",
+				"Final Fantasy VI",
+				"Assassin's Creed II",
+				"Paper Mario: TYD",
+				"Tales of Symphonia",
+				"Star Wars: KOTOR",
+				"Xenogears",
+				"Zelda: The Wind Waker",
+				"Pokemon X/Y",
+				"Smash Bros. Wii U",
+				"Planescape: Torment",
+				"Super Mario Galaxy 2",
+				"Mass Effect",
+				"Minecraft",
+				"Halo: Combat Evolved",
+				"Final Fantasy VII",
+				"Journey",
+				"Super Mario Bros. 3",
+				"Age of Empires II",
+				"Pokemon Red/Blue",
+				"Tetris",
+				"Portal 2",
+				"Sonic the Hedgehog 2",
+				"Uncharted 2",
+				"The Walking Dead",
+				"Fallout 3",
+				"Life is Strange",
+				"Undertale",
+				"Mass Effect 3",
+				"GTA: Vice City",
+				"Final Fantasy VIII",
+				"Super Mario World",
+				"Animal Crossing New Leaf",
+				"Skyrim",
+				"Phoenix Wright",
+				"GoldenEye 007",
+				"Diablo II",
+				"Metroid Prime",
+				"Morrowind",
+				"Half-Life 2",
+				"Demon's Souls",
+				"Super Mario 64",
+				"Mario Kart 8",
+				"Final Fantasy Tactics",
+				"Resident Evil 2",
+				"Zelda: Twilight Princess",
+				"Skies of Arcadia",
+				"Persona 4",
+				"999",
+				"Zelda: Ocarina of Time",
+				"Hearthstone",
+				"Suikoden II",
+				"Monster Hunter 4U",
+				"Okami",
+				"Warcraft III",
+				"Final Fantasy IX",
+				"Kingdom Hearts",
+				"Xenoblade Chronicles",
+				"DK Country 2",
+				"Fire Emblem: Awakening",
+				"Super Mario Maker",
+				"Banjo-Kazooie",
+				"Baldur's Gate II",
+				"Castlevania: SOTN",
+				"Phoenix Wright: Trials",
+				"Zelda: A Link to the Past",
+				"Cave Story",
+				"Deus Ex",
+				"Final Fantasy IV",
+				"Metal Gear Solid V",
+				"Perfect Dark",
+				"Dark Souls",
+				"Civilization V",
+				"Super Metroid",
+				"Call of Duty 4",
+				"Super Mario Galaxy",
+				"Dragon Age: Origins",
+				"Bloodborne",
+				"Final Fantasy XII",
+				"Zelda: Majora's Mask",
+				"Valkyria Chronicles",
+				"Grand Theft Auto V",
+				"Shenmue",
+				"Oblivion",
+				"Super Mario RPG",
+				"GTA: San Andreas",
+				"Shovel Knight",
+				"World of Warcraft",
+				"Chrono Cross",
+				"The Witcher 3",
+				"Binding of Isaac Rebirth",
+				"Metal Gear Solid 2",
+				"Resident Evil",
+				"Fallout: New Vegas",
+				"BioShock Infinite",
+				"Resident Evil 4",
+				"Paper Mario",
+				"Metal Gear Solid",
+				"Splatoon",
+				"EarthBound",
+				"Borderlands 2",
+				"Shadow of the Colossus",
+				"Team Fortress 2",
+				"Red Dead Redemption",
+				"Bayonetta 2",
+				"Metal Gear Solid 3",
+				"Mother 3",
+				"BioShock",
+				"Silent Hill 2",
+				"Starcraft",
+				"Destiny",
+				"Mass Effect 2",
+				"Virtue's Last Reward"
+			]
+		}
+
+		// restore existing custom words
+		let entries = [];
+		const customWordsData = window.localStorage.getItem('custom-words');
+		if (customWordsData) {
+			const customWords = JSON.parse(customWordsData);
+			entries = customWords;
+
+			document.querySelector('#custom-words').value = customWords.join("\n");
+		} else {
+			entries = defaultTerms.games;
+		}
+		
+		// init the actual thing
+		const ranks = new ranking(entries, controls);
+
+		</script>
+	</div>
+</body>
+</html>
